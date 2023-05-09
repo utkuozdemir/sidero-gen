@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/siderolabs/gen/containers"
@@ -183,6 +184,51 @@ func parallelGetOrCreate(t *testing.T, m *containers.ConcurrentMap[int, int], ou
 	}
 
 	require.True(t, oneAnotherGet)
+}
+
+func TestConcurrentMap_CreateOrUpdate(t *testing.T) {
+	var m containers.ConcurrentMap[int, int]
+
+	t.Run("group", func(t *testing.T) {
+		t.Run("try to insert value", func(t *testing.T) {
+			parallelCreateOrUpdate(t, &m)
+		})
+
+		t.Run("try to insert value #2", func(t *testing.T) {
+			parallelCreateOrUpdate(t, &m)
+		})
+
+		m.ForEach(func(k int, v int) {
+			assert.Negativef(t, v, "key %d is not negative", k)
+		})
+	})
+}
+
+func parallelCreateOrUpdate(t *testing.T, m *containers.ConcurrentMap[int, int]) {
+	t.Parallel()
+
+	keys := make([]int, 0, 10000)
+	for i := 1; i <= 10000; i++ {
+		keys = append(keys, i)
+	}
+
+	rand.Shuffle(len(keys), func(i, j int) {
+		keys[i], keys[j] = keys[j], keys[i]
+	})
+
+	for _, i := range keys {
+		i := i
+
+		res := m.CreateOrUpdate(i, func(existing int, exists bool) int {
+			if !exists {
+				return i
+			}
+
+			return -existing
+		})
+
+		assert.True(t, res == i || res < 0)
+	}
 }
 
 func Example_benchConcurrentMap() {

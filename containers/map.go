@@ -65,6 +65,26 @@ func (m *ConcurrentMap[K, V]) GetOrCall(key K, fn func() V) (V, bool) {
 	return val, false
 }
 
+// CreateOrUpdate creates or updates the value for the given key.
+// The function fn is called with the current (or zero) value and a boolean indicating whether the value was present.
+// The function should return the new value.
+func (m *ConcurrentMap[K, V]) CreateOrUpdate(key K, fn func(V, bool) V) V {
+	m.mx.Lock()
+	defer m.mx.Unlock()
+
+	if m.m == nil {
+		m.m = map[K]V{}
+	}
+
+	val, ok := m.m[key]
+
+	newVal := fn(val, ok)
+
+	m.m[key] = newVal
+
+	return newVal
+}
+
 // Set sets the value for the given key.
 func (m *ConcurrentMap[K, V]) Set(key K, val V) {
 	m.mx.Lock()
